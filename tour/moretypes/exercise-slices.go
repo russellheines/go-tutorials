@@ -9,7 +9,7 @@ func Pic(dx, dy int) [][]uint8 {
 		for v := 0; v < dx; v++ {
 			//p[u][v] = uint8((u+v)/2)
 			//p[u][v] = uint8(u*v)
-			p[u][v] = uint8(u ^ v)
+			p[u][v] = uint8(u^v)
 		}
 	}
 	return p
