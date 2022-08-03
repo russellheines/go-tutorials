@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -16,57 +15,36 @@ var (
 	//store = sessions.NewFilesystemStore("./", key)
 )
 
+type User struct {
+	ID   string
+	Name string
+}
+
 func index(w http.ResponseWriter, r *http.Request) {
 	// Get a session. We're ignoring the error resulted from decoding an
 	// existing session: Get() always returns a session, even if empty.
 	session, _ := store.Get(r, "go-session")
 
-	// Check if user is authenticated
-	if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
+	var user *User
+	if _, ok := session.Values["userid"]; ok {
+		user = &User{
+			Name: session.Values["name"].(string),
+		}
 	}
 
-	fmt.Fprintln(w, "Hello, logged in user!")
+	t, err := template.ParseFiles("templates/index.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	t.Execute(w, user)
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "GET":
-		t, err := template.ParseFiles("templates/login.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		t.Execute(w, nil)
-
-	case "POST":
-		// TODO: Validate username and password!
-		if r.FormValue("username") != "" && r.FormValue("password") != "" {
-			session, _ := store.Get(r, "go-session")
-
-			// Set user as authenticated
-			session.Values["authenticated"] = true
-			err := session.Save(r, w)
-			if err != nil {
-				http.Error(w, "Failed to save session", http.StatusInternalServerError)
-				return
-			}
-
-			http.Redirect(w, r, "/", http.StatusFound)
-			return
-		}
-
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-}
-
-func logout(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "go-session")
 
-	session.Values["authenticated"] = false
-	session.Options.MaxAge = -1  // will delete the session if using FilesystemStore
+	session.Values["userid"] = 101
+	session.Values["name"] = "Gorilla User"
 
 	err := session.Save(r, w)
 	if err != nil {
@@ -74,7 +52,24 @@ func logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintln(w, "Logged out!")
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func logout(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "go-session")
+
+	delete(session.Values, "userid")
+	delete(session.Values, "name")
+
+	session.Options.MaxAge = -1 // if using FilesystemStore, this will also delete the session on the server side
+
+	err := session.Save(r, w)
+	if err != nil {
+		http.Error(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func main() {
